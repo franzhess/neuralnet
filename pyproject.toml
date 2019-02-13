@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neuralnet-minimax"
+version = "0.1.0"
+description = "A NumPy neural network learning tic-tac-toe from a minimax teacher"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Franz Hess"}]
+dependencies = ["numpy>=1.26,<3"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1", "build>=1,<2"]
+
+[project.scripts]
+neuralnet-demo = "neuralnet.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["neuralnet*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --import-mode=importlib"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "N"]
+
+[tool.ruff.format]
+quote-style = "single"

@@ -1,0 +1,32 @@
+{
+  "command": "python -m neuralnet demo",
+  "training": {
+    "dataset_sha256": "c6e7fe0c669b8a7ff1ad45f327f0de11297f141f6fb5a93f69cf87128cecea3e",
+    "seed": 42,
+    "test_fraction": 0.2,
+    "hidden_nodes": 64,
+    "epochs": 300,
+    "batch_size": 64,
+    "learning_rate": 0.1,
+    "train_samples": 3603,
+    "test_samples": 917,
+    "initial_train_loss": 4.7918927721474756,
+    "final_train_loss": 0.1557671003900564,
+    "held_out_loss": 0.20225406243938504,
+    "python_version": "3.11.13",
+    "numpy_version": "2.4.6"
+  },
+  "evaluation": {
+    "evaluation_seed": 123,
+    "games_per_matchup": 200,
+    "held_out_samples": 917,
+    "held_out_loss": 0.20225406243938504,
+    "neural_optimal_move_agreement": 0.9858233369683751,
+    "random_optimal_move_agreement": 0.59810977826245,
+    "neural_vs_random": {"wins": 187, "draws": 11, "losses": 2},
+    "neural_vs_minimax": {"wins": 0, "draws": 156, "losses": 44},
+    "random_vs_random": {"wins": 81, "draws": 25, "losses": 94},
+    "minimax_vs_random": {"wins": 176, "draws": 24, "losses": 0},
+    "minimax_vs_minimax": {"wins": 0, "draws": 200, "losses": 0}
+  }
+}
