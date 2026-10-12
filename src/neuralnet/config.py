@@ -11,18 +11,29 @@ class ExperimentConfig:
     """Immutable defaults shared by the Python API, CLI and saved checkpoints."""
 
     seed: int = 42
+    split_seed: int = 42
     test_fraction: float = 0.2
     hidden_nodes: int = 64
     epochs: int = 300
     batch_size: int = 64
     learning_rate: float = 0.1
-    games: int = 200
+    games: int = 1000
     evaluation_seed: int = 123
+    networks: int = 10
 
     def __post_init__(self) -> None:
-        for name in ('seed', 'evaluation_seed', 'epochs', 'hidden_nodes', 'batch_size', 'games'):
+        for name in (
+            'seed',
+            'split_seed',
+            'evaluation_seed',
+            'epochs',
+            'hidden_nodes',
+            'batch_size',
+            'games',
+            'networks',
+        ):
             value = getattr(self, name)
-            minimum = 0 if name in ('seed', 'evaluation_seed', 'epochs') else 1
+            minimum = 0 if name in ('seed', 'split_seed', 'evaluation_seed', 'epochs') else 1
             if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise ValueError(f'{name} must be an integer of at least {minimum}')
         if self.games < 2 or self.games % 2:
@@ -44,9 +55,16 @@ class ExperimentConfig:
     def from_metadata(cls, metadata: Mapping[str, Any]) -> Self:
         """Read configuration fields, ignoring metrics and defaulting missing fields.
 
-        Earlier checkpoints did not record evaluation settings, so those fields
-        use the same defaults as a new experiment.
+        Legacy checkpoints coupled their training and split seeds and defaulted
+        to 200 evaluation games. Preserve those settings when fields are absent.
         """
-        return cls(
-            **{field.name: metadata[field.name] for field in fields(cls) if field.name in metadata}
-        )
+        settings = {
+            field.name: metadata[field.name] for field in fields(cls) if field.name in metadata
+        }
+        if 'split_seed' not in settings and 'seed' in settings:
+            settings['split_seed'] = settings['seed']
+        if metadata and 'games' not in settings:
+            settings['games'] = 200
+        if metadata and 'networks' not in settings:
+            settings['networks'] = 1
+        return cls(**settings)

@@ -19,12 +19,14 @@ def _add_training_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--batch-size', type=int, default=_DEFAULTS.batch_size)
     parser.add_argument('--learning-rate', type=float, default=_DEFAULTS.learning_rate)
     parser.add_argument('--seed', type=int, default=_DEFAULTS.seed)
+    parser.add_argument('--split-seed', type=int, default=_DEFAULTS.split_seed)
     parser.add_argument('--test-fraction', type=float, default=_DEFAULTS.test_fraction)
 
 
 def _experiment_config(args: argparse.Namespace) -> ExperimentConfig:
     return ExperimentConfig(
         seed=getattr(args, 'seed', _DEFAULTS.seed),
+        split_seed=getattr(args, 'split_seed', _DEFAULTS.split_seed),
         test_fraction=getattr(args, 'test_fraction', _DEFAULTS.test_fraction),
         hidden_nodes=getattr(args, 'hidden_nodes', _DEFAULTS.hidden_nodes),
         epochs=getattr(args, 'epochs', _DEFAULTS.epochs),
@@ -32,6 +34,7 @@ def _experiment_config(args: argparse.Namespace) -> ExperimentConfig:
         learning_rate=getattr(args, 'learning_rate', _DEFAULTS.learning_rate),
         games=getattr(args, 'games', _DEFAULTS.games),
         evaluation_seed=getattr(args, 'evaluation_seed', _DEFAULTS.evaluation_seed),
+        networks=getattr(args, 'networks', _DEFAULTS.networks),
     )
 
 

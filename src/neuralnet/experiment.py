@@ -19,7 +19,7 @@ def train_model(
 ) -> NeuralNetwork:
     """Train with shared settings and record the exact configuration in the model."""
     config = config if config is not None else ExperimentConfig()
-    train, test = split_indices(inputs, seed=config.seed, test_fraction=config.test_fraction)
+    train, test = split_indices(inputs, seed=config.split_seed, test_fraction=config.test_fraction)
     model = NeuralNetwork(
         9, config.hidden_nodes, 9, Tanh(), seed=config.seed, learning_rate=config.learning_rate
     )
@@ -87,7 +87,7 @@ def evaluate(
     training_config = ExperimentConfig.from_metadata(metadata)
     config = config if config is not None else training_config
     _, test = split_indices(
-        inputs, seed=training_config.seed, test_fraction=training_config.test_fraction
+        inputs, seed=training_config.split_seed, test_fraction=training_config.test_fraction
     )
     neural = neural_policy(model)
     match_settings = {'games': config.games, 'seed': config.evaluation_seed}

@@ -39,14 +39,31 @@ def test_evaluation_override_cannot_change_recorded_training_split():
     assert report['evaluation_seed'] == 10
 
 
-def test_older_checkpoints_use_shared_evaluation_defaults():
+def test_older_checkpoints_preserve_legacy_evaluation_defaults():
     inputs, targets = generate_dataset()
-    model = train_model(inputs, targets, config=ExperimentConfig(epochs=0, hidden_nodes=8))
+    model = train_model(
+        inputs, targets, config=ExperimentConfig(epochs=0, hidden_nodes=8, seed=7, split_seed=7)
+    )
     del model.metadata['games']
     del model.metadata['evaluation_seed']
+    del model.metadata['split_seed']
+    del model.metadata['networks']
     report = evaluate(model, inputs, targets)
-    assert report['games_per_matchup'] == ExperimentConfig().games
+    assert report['games_per_matchup'] == 200
+    assert report['held_out_samples'] == model.metadata['test_samples']
     assert report['evaluation_seed'] == ExperimentConfig().evaluation_seed
+
+
+def test_training_seed_does_not_change_the_held_out_split():
+    from dataclasses import replace
+
+    inputs, targets = generate_dataset()
+    config = ExperimentConfig(epochs=0, hidden_nodes=8, games=4)
+    first = train_model(inputs, targets, config=config)
+    second = train_model(inputs, targets, config=replace(config, seed=99))
+    assert first.metadata['test_samples'] == second.metadata['test_samples']
+    assert first.metadata['split_seed'] == second.metadata['split_seed']
+    assert not np.array_equal(first.input_weights, second.input_weights)
 
 
 def test_agreement_counts_all_optimal_moves_not_one_teacher_choice():

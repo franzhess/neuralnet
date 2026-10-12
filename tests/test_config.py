@@ -26,6 +26,8 @@ def test_config_round_trips_with_unrelated_checkpoint_metadata():
     'settings',
     [
         {'seed': -1},
+        {'split_seed': -1},
+        {'networks': 0},
         {'evaluation_seed': -1},
         {'epochs': -1},
         {'epochs': 1.5},
@@ -52,3 +54,10 @@ def test_config_rejects_invalid_settings(settings):
 
 def test_zero_epochs_supports_an_untrained_baseline():
     assert ExperimentConfig(epochs=0).epochs == 0
+
+
+def test_legacy_metadata_preserves_coupled_seeds_and_evaluation_defaults():
+    config = ExperimentConfig.from_metadata({'seed': 7, 'epochs': 1})
+    assert config.seed == config.split_seed == 7
+    assert config.games == 200
+    assert config.networks == 1
