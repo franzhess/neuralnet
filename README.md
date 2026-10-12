@@ -28,25 +28,29 @@ python -m pip install -e '.[dev]'
 python -m neuralnet demo
 ```
 
-The demo generates data, trains for 300 epochs, and evaluates 200 games per matchup.
-It writes `artifacts/moves.json`, `artifacts/model.npz`, and
-`artifacts/experiment.json`. The JSON report includes hyperparameters, seeds,
-environment versions, dataset fingerprint, losses, and game outcomes. Generated
-artifacts are ignored by Git. Existing outputs in the chosen directory are replaced.
+The demo trains **10 networks for 300 epochs each**, with **1,000 games per network
+per matchup**: 50,000 games across five matchups. All networks share one held-out
+split, with training seeds 42–51 and gameplay seeds 123–132.
+
+It writes `artifacts/moves.json`, ten checkpoints under `artifacts/models/`, and
+`artifacts/experiment.json`. The report preserves every network's configuration,
+held-out indices, losses, game outcomes, role-specific statistics, and aggregate
+uncertainty estimates. Generated artifacts are ignored by Git. Existing outputs
+with the same names are replaced; use a fresh output directory for a new cohort.
 
 For a quick smoke test:
 
 ```sh
-python -m neuralnet demo --epochs 2 --games 4 --output-dir artifacts/smoke
+python -m neuralnet demo --networks 2 --epochs 2 --games 4 --output-dir artifacts/smoke
 ```
 
-Or run each stage independently:
+Or train and evaluate a single network independently:
 
 ```sh
 python -m neuralnet generate artifacts/moves.json
-python -m neuralnet train artifacts/moves.json artifacts/model.npz --seed 42
+python -m neuralnet train artifacts/moves.json artifacts/model.npz --seed 42 --split-seed 42
 python -m neuralnet evaluate artifacts/moves.json artifacts/model.npz \
-    --games 200 --seed 123 --output artifacts/evaluation.json
+    --games 1000 --seed 123 --output artifacts/evaluation.json
 ```
 
 `neuralnet-demo` is an equivalent installed entry point. Use `--help` on any command
@@ -54,30 +58,63 @@ to see its options. Game counts must be even so each player gets equal turns as 
 and O. Evaluation checks the dataset fingerprint and reuses the split recorded in
 the checkpoint.
 
+`demo --networks` controls the cohort size. `--seed` and `--evaluation-seed` are
+the first training/gameplay seeds; each subsequent network increments them by
+one. `--split-seed` remains fixed for the entire cohort. To re-evaluate an individual
+cohort checkpoint, use `evaluate artifacts/moves.json artifacts/models/network-01.npz`.
+
 ## Results—not an unbeatable neural player
 
-One default run, using Python 3.11.13 and NumPy 2.4.6, produced the following results.
-The recorded configuration and full metrics are in [docs/results.json](docs/results.json).
+The aggregate snapshot is in [docs/results.json](docs/results.json); generating
+the experiment also saves all individual runs in `artifacts/experiment.json`.
 
-- Training positions: **3,603**; held-out positions: **917**.
-- Held-out optimal-move agreement: **98.6%** for the network versus **59.8%** for
-  a uniformly random legal move.
-- Training loss fell from **4.792** to **0.156**; held-out loss was **0.202**.
+The recorded cohort used Python 3.11.13 and NumPy 2.4.6, with **3,603 training
+positions** and the same **917 held-out positions** for every network:
+
+- Optimal-move agreement: **99.24% mean**, **0.44 percentage points standard
+  deviation**, range **98.47–99.89%**. Bootstrap interval for the mean: **98.96–99.49%**.
+- Held-out loss: **0.189 mean**, **0.012 standard deviation**.
+- Neural loss rate against minimax: **12.44% mean**, **8.93 percentage points
+  standard deviation**, range **0–22.6%**. Bootstrap interval for the mean: **7.13–17.65%**.
 
 | Player vs opponent | Wins | Draws | Losses |
 | --- | ---: | ---: | ---: |
-| Neural network vs random | 187 | 11 | 2 |
-| Neural network vs minimax | 0 | 156 | 44 |
-| Random vs random | 81 | 25 | 94 |
-| Minimax vs random | 176 | 24 | 0 |
-| Minimax vs minimax | 0 | 200 | 0 |
+| Neural network vs random | 9,317 | 623 | 60 |
+| Neural network vs minimax | 0 | 8,756 | 1,244 |
+| Random vs random | 4,402 | 1,256 | 4,342 |
+| Minimax vs random | 8,719 | 1,281 | 0 |
+| Minimax vs minimax | 0 | 10,000 | 0 |
+
+Each row totals 10,000 games, half with the evaluated player as X and half as O.
+Two networks recorded no losses against minimax, but that is **not a proof** they
+are unbeatable. The neural player wins more often against this random opponent
+than this minimax policy, but also loses: minimax optimizes the worst-case outcome
+and breaks ties randomly, rather than maximizing wins against a stochastic opponent.
 
 High per-position agreement does **not** imply reliable play over an entire game.
-The network still loses to optimal play, whereas minimax has an exact guarantee.
-These are single-seed samples, not evidence that the network is better than minimax
-because it won more games against random in this particular run. Gameplay starts
-from the empty board and can visit training positions; only the position-level
-metrics use the held-out set.
+Minimax has an exact guarantee; the network only approximates its strategy.
+Gameplay starts from the empty board and can visit training positions; only the
+position-level metrics use the held-out set.
+
+### What the uncertainty estimates mean
+
+- **Between-run variation:** mean, sample standard deviation, minimum, and maximum
+  across networks. Neural matchups vary with training and gameplay randomness;
+  the fixed-policy baselines vary only with gameplay randomness.
+- **Cohort mean intervals:** approximate 95% percentile-bootstrap intervals from
+  10,000 resamples of **whole network runs**, using bootstrap seed 0. The 10,000
+  games per matchup are not treated as 10,000 independent trained networks.
+- **Individual-network intervals:** marginal 95% Wilson intervals for win/draw/loss
+  rates, with separate X/O outcome rates and intervals. Overall intervals pool the balanced
+  roles and are approximations, not simultaneous intervals for all three outcomes.
+- **Limits:** ten networks are still a small sample. Intervals are conditional on
+  this dataset, held-out split, architecture, and hyperparameters. They are not
+  corrected for multiple comparisons and are not significance tests. If every
+  observed run has zero losses, an empirical bootstrap can produce `[0, 0]`; that
+  does **not** prove a zero loss probability. Per-network Wilson upper bounds remain
+  nonzero. Minimax's guarantee comes from exhaustive verification, not sampling.
+
+No best-performing network is selected: every trained network is saved and included.
 
 ## How it works
 
@@ -90,6 +127,8 @@ metrics use the held-out set.
 4. Split by rotation/reflection symmetry groups before training. A rotated copy of
    a training board cannot appear in the held-out set. The default holds out 20%
    of groups, so the row fraction is approximately, not exactly, 20%.
+   Save the actual held-out indices in each checkpoint, and keep them identical
+   across networks while changing initialization and shuffling seeds.
 5. Train a **9 → 64 → 9** network with tanh activations, bias rows, Xavier uniform
    initialization, mini-batch SGD, and an explicit learning rate. All gradients
    are computed with NumPy matrix operations.
@@ -132,6 +171,7 @@ choices among tied best legal moves.
 | `src/neuralnet/players.py` | Random/minimax/neural policies and game runner |
 | `src/neuralnet/experiment.py` | Training, held-out metrics, baseline tournaments |
 | `src/neuralnet/config.py` | Immutable experiment settings, shared defaults and validation |
+| `src/neuralnet/statistics.py` | Wilson intervals and network-level bootstrap summaries |
 | `src/neuralnet/cli.py` | Explicit command-line workflow |
 | `tests/` | Numerical, rules, data, reproducibility, and end-to-end tests |
 
@@ -175,15 +215,20 @@ from neuralnet.data import generate_dataset
 from neuralnet.experiment import evaluate, train_model
 
 inputs, targets = generate_dataset()
-config = ExperimentConfig(epochs=100, hidden_nodes=32, games=200)
+config = ExperimentConfig(epochs=100, hidden_nodes=32, games=1000)
 model = train_model(inputs, targets, config=config)
 report = evaluate(model, inputs, targets)
 ```
 
-The checkpoint records the full configuration. Evaluation without an override
+For a full cohort, call `run_experiment(inputs, targets, config=config)` from
+`neuralnet.experiment`; it returns the list of networks and the complete report.
+
+The checkpoint records the full configuration and held-out indices. Evaluation
+without an override
 reuses those settings; an explicit configuration can change the game count and
 evaluation seed, but **never changes the recorded training/test split**. Older
-checkpoints use shared defaults for evaluation settings they did not record.
+checkpoints retain their coupled split/training seed and legacy 200-game default
+when those fields were not recorded.
 Zero epochs are allowed to evaluate an untrained baseline.
 
 ## Verification
@@ -200,6 +245,9 @@ and tanh, XOR convergence, complete batch coverage, all eight winning lines,
 dataset rejection cases, symmetry separation, model round-trips, and a CLI pipeline.
 An exhaustive continuation test verifies minimax cannot lose from the empty board
 as either player, against every legal opponent continuation.
+Additional tests verify cohort reproducibility, distinct seeds with identical
+held-out membership, X/O balancing, statistical interval calculations, and reload
+of each independently saved checkpoint.
 
 To check packaging independently, install the wheel from `dist/` into a fresh
 virtual environment and run the demo outside the source tree.

@@ -1,32 +1,258 @@
 {
-  "command": "python -m neuralnet demo",
-  "training": {
-    "dataset_sha256": "c6e7fe0c669b8a7ff1ad45f327f0de11297f141f6fb5a93f69cf87128cecea3e",
+  "command": "python -m neuralnet demo --output-dir artifacts/cohort",
+  "schema_version": 2,
+  "config": {
     "seed": 42,
+    "split_seed": 42,
     "test_fraction": 0.2,
     "hidden_nodes": 64,
     "epochs": 300,
     "batch_size": 64,
     "learning_rate": 0.1,
-    "train_samples": 3603,
-    "test_samples": 917,
-    "initial_train_loss": 4.7918927721474756,
-    "final_train_loss": 0.1557671003900564,
-    "held_out_loss": 0.20225406243938504,
-    "python_version": "3.11.13",
-    "numpy_version": "2.4.6"
-  },
-  "evaluation": {
+    "games": 1000,
     "evaluation_seed": 123,
-    "games_per_matchup": 200,
-    "held_out_samples": 917,
-    "held_out_loss": 0.20225406243938504,
-    "neural_optimal_move_agreement": 0.9858233369683751,
-    "random_optimal_move_agreement": 0.59810977826245,
-    "neural_vs_random": {"wins": 187, "draws": 11, "losses": 2},
-    "neural_vs_minimax": {"wins": 0, "draws": 156, "losses": 44},
-    "random_vs_random": {"wins": 81, "draws": 25, "losses": 94},
-    "minimax_vs_random": {"wins": 176, "draws": 24, "losses": 0},
-    "minimax_vs_minimax": {"wins": 0, "draws": 200, "losses": 0}
-  }
+    "networks": 10
+  },
+  "dataset_sha256": "c6e7fe0c669b8a7ff1ad45f327f0de11297f141f6fb5a93f69cf87128cecea3e",
+  "environment": {"python_version": "3.11.13", "numpy_version": "2.4.6"},
+  "split": {"train_samples": 3603, "held_out_samples": 917},
+  "summary": {
+    "networks": 10,
+    "games_per_network_per_matchup": 1000,
+    "bootstrap_seed": 0,
+    "bootstrap_resamples": 10000,
+    "interval_method": "95% percentile bootstrap of whole network runs",
+    "metrics": {
+      "held_out_loss": {
+        "mean": 0.18923557471604974,
+        "std": 0.012129309315260822,
+        "min": 0.1669952070912509,
+        "max": 0.20423021514317105,
+        "bootstrap_mean_ci95": [0.18196878181394374, 0.19610716409564255]
+      },
+      "neural_optimal_move_agreement": {
+        "mean": 0.9923664122137404,
+        "std": 0.004422219215047792,
+        "min": 0.9847328244274809,
+        "max": 0.9989094874591058,
+        "bootstrap_mean_ci95": [0.989640130861505, 0.9948745910577971]
+      },
+      "random_optimal_move_agreement": {
+        "mean": 0.59810977826245,
+        "std": 0.0,
+        "min": 0.59810977826245,
+        "max": 0.59810977826245,
+        "bootstrap_mean_ci95": [0.59810977826245, 0.59810977826245]
+      }
+    },
+    "matchups": {
+      "neural_vs_random": {
+        "games": 10000,
+        "counts": {"wins": 9317, "draws": 623, "losses": 60},
+        "rates": {
+          "wins": {
+            "mean": 0.9317000000000002,
+            "std": 0.0126671052555647,
+            "min": 0.906,
+            "max": 0.949,
+            "bootstrap_mean_ci95": [0.9239, 0.9387000000000001]
+          },
+          "draws": {
+            "mean": 0.0623,
+            "std": 0.009416887903005842,
+            "min": 0.051,
+            "max": 0.08,
+            "bootstrap_mean_ci95": [0.05700000000000001, 0.068]
+          },
+          "losses": {
+            "mean": 0.006,
+            "std": 0.0045460605656619515,
+            "min": 0.0,
+            "max": 0.014,
+            "bootstrap_mean_ci95": [0.0033975000000000016, 0.0086]
+          }
+        }
+      },
+      "neural_vs_minimax": {
+        "games": 10000,
+        "counts": {"wins": 0, "draws": 8756, "losses": 1244},
+        "rates": {
+          "wins": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "bootstrap_mean_ci95": [0.0, 0.0]
+          },
+          "draws": {
+            "mean": 0.8756,
+            "std": 0.0893298506783831,
+            "min": 0.774,
+            "max": 1.0,
+            "bootstrap_mean_ci95": [0.8235000000000001, 0.9286999999999999]
+          },
+          "losses": {
+            "mean": 0.1244,
+            "std": 0.0893298506783831,
+            "min": 0.0,
+            "max": 0.226,
+            "bootstrap_mean_ci95": [0.0713, 0.1765]
+          }
+        }
+      },
+      "random_vs_random": {
+        "games": 10000,
+        "counts": {"wins": 4402, "draws": 1256, "losses": 4342},
+        "rates": {
+          "wins": {
+            "mean": 0.44020000000000004,
+            "std": 0.01128223776069664,
+            "min": 0.422,
+            "max": 0.462,
+            "bootstrap_mean_ci95": [0.43360000000000004, 0.44699999999999995]
+          },
+          "draws": {
+            "mean": 0.1256,
+            "std": 0.006915361322607972,
+            "min": 0.117,
+            "max": 0.14,
+            "bootstrap_mean_ci95": [0.12179999999999999, 0.12980000000000003]
+          },
+          "losses": {
+            "mean": 0.43420000000000003,
+            "std": 0.01283051917196738,
+            "min": 0.415,
+            "max": 0.449,
+            "bootstrap_mean_ci95": [0.42639999999999995, 0.44140250000000003]
+          }
+        }
+      },
+      "minimax_vs_random": {
+        "games": 10000,
+        "counts": {"wins": 8719, "draws": 1281, "losses": 0},
+        "rates": {
+          "wins": {
+            "mean": 0.8719000000000001,
+            "std": 0.010148344145174083,
+            "min": 0.848,
+            "max": 0.885,
+            "bootstrap_mean_ci95": [0.8654, 0.8772]
+          },
+          "draws": {
+            "mean": 0.12810000000000002,
+            "std": 0.010148344145174073,
+            "min": 0.115,
+            "max": 0.152,
+            "bootstrap_mean_ci95": [0.12279999999999999, 0.1346]
+          },
+          "losses": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "bootstrap_mean_ci95": [0.0, 0.0]
+          }
+        }
+      },
+      "minimax_vs_minimax": {
+        "games": 10000,
+        "counts": {"wins": 0, "draws": 10000, "losses": 0},
+        "rates": {
+          "wins": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "bootstrap_mean_ci95": [0.0, 0.0]
+          },
+          "draws": {
+            "mean": 1.0,
+            "std": 0.0,
+            "min": 1.0,
+            "max": 1.0,
+            "bootstrap_mean_ci95": [1.0, 1.0]
+          },
+          "losses": {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "bootstrap_mean_ci95": [0.0, 0.0]
+          }
+        }
+      }
+    }
+  },
+  "runs": [
+    {
+      "network_index": 1, "training_seed": 42, "evaluation_seed": 123,
+      "held_out_loss": 0.20225406243938504,
+      "optimal_move_agreement": 0.9858233369683751,
+      "neural_vs_random": {"wins": 942, "draws": 51, "losses": 7},
+      "neural_vs_minimax": {"wins": 0, "draws": 774, "losses": 226}
+    },
+    {
+      "network_index": 2, "training_seed": 43, "evaluation_seed": 124,
+      "held_out_loss": 0.1801336399908341,
+      "optimal_move_agreement": 0.9912758996728462,
+      "neural_vs_random": {"wins": 928, "draws": 71, "losses": 1},
+      "neural_vs_minimax": {"wins": 0, "draws": 946, "losses": 54}
+    },
+    {
+      "network_index": 3, "training_seed": 44, "evaluation_seed": 125,
+      "held_out_loss": 0.20423021514317105,
+      "optimal_move_agreement": 0.9847328244274809,
+      "neural_vs_random": {"wins": 933, "draws": 60, "losses": 7},
+      "neural_vs_minimax": {"wins": 0, "draws": 828, "losses": 172}
+    },
+    {
+      "network_index": 4, "training_seed": 45, "evaluation_seed": 126,
+      "held_out_loss": 0.1826589164194444,
+      "optimal_move_agreement": 0.9912758996728462,
+      "neural_vs_random": {"wins": 906, "draws": 80, "losses": 14},
+      "neural_vs_minimax": {"wins": 0, "draws": 787, "losses": 213}
+    },
+    {
+      "network_index": 5, "training_seed": 46, "evaluation_seed": 127,
+      "held_out_loss": 0.1913140909733719,
+      "optimal_move_agreement": 0.9934569247546347,
+      "neural_vs_random": {"wins": 949, "draws": 51, "losses": 0},
+      "neural_vs_minimax": {"wins": 0, "draws": 1000, "losses": 0}
+    },
+    {
+      "network_index": 6, "training_seed": 47, "evaluation_seed": 128,
+      "held_out_loss": 0.17997747497412867,
+      "optimal_move_agreement": 0.9989094874591058,
+      "neural_vs_random": {"wins": 937, "draws": 58, "losses": 5},
+      "neural_vs_minimax": {"wins": 0, "draws": 891, "losses": 109}
+    },
+    {
+      "network_index": 7, "training_seed": 48, "evaluation_seed": 129,
+      "held_out_loss": 0.1669952070912509,
+      "optimal_move_agreement": 0.9967284623773174,
+      "neural_vs_random": {"wins": 929, "draws": 63, "losses": 8},
+      "neural_vs_minimax": {"wins": 0, "draws": 777, "losses": 223}
+    },
+    {
+      "network_index": 8, "training_seed": 49, "evaluation_seed": 130,
+      "held_out_loss": 0.1862052898911062,
+      "optimal_move_agreement": 0.9923664122137404,
+      "neural_vs_random": {"wins": 945, "draws": 55, "losses": 0},
+      "neural_vs_minimax": {"wins": 0, "draws": 1000, "losses": 0}
+    },
+    {
+      "network_index": 9, "training_seed": 50, "evaluation_seed": 131,
+      "held_out_loss": 0.19735777824619496,
+      "optimal_move_agreement": 0.9945474372955289,
+      "neural_vs_random": {"wins": 920, "draws": 71, "losses": 9},
+      "neural_vs_minimax": {"wins": 0, "draws": 929, "losses": 71}
+    },
+    {
+      "network_index": 10, "training_seed": 51, "evaluation_seed": 132,
+      "held_out_loss": 0.20122907199161,
+      "optimal_move_agreement": 0.9945474372955289,
+      "neural_vs_random": {"wins": 928, "draws": 63, "losses": 9},
+      "neural_vs_minimax": {"wins": 0, "draws": 824, "losses": 176}
+    }
+  ]
 }
