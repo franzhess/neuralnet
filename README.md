@@ -29,7 +29,7 @@ python -m neuralnet demo
 ```
 
 The demo trains **10 networks for 300 epochs each**, with **1,000 games per network
-per matchup**: 50,000 games across five matchups. All networks share one held-out
+per matchup**: 80,000 games across eight matchups. All networks share one held-out
 split, with training seeds 42–51 and gameplay seeds 123–132.
 
 It writes `artifacts/moves.json`, ten checkpoints under `artifacts/models/`, and
@@ -84,17 +84,60 @@ positions** and the same **917 held-out positions** for every network:
 | Random vs random | 4,402 | 1,256 | 4,342 |
 | Minimax vs random | 8,719 | 1,281 | 0 |
 | Minimax vs minimax | 0 | 10,000 | 0 |
+| Neural network vs random-aware minimax | 0 | 7,533 | 2,467 |
+| Random-aware minimax vs random | 9,546 | 454 | 0 |
+| Random-aware minimax vs minimax | 0 | 10,000 | 0 |
 
 Each row totals 10,000 games, half with the evaluated player as X and half as O.
 Two networks recorded no losses against minimax, but that is **not a proof** they
-are unbeatable. The neural player wins more often against this random opponent
-than this minimax policy, but also loses: minimax optimizes the worst-case outcome
-and breaks ties randomly, rather than maximizing wins against a stochastic opponent.
+are unbeatable. Random-tie minimax optimizes the worst-case outcome, not the win
+rate against a stochastic opponent. The new random-aware baseline resolves that
+distinction while retaining the same safety guarantee.
+
+Against random play, random-aware minimax won **95.46%** of sampled games
+(bootstrap interval **95.09–95.79%**), versus the networks' **93.17%**
+(**92.39–93.87%**). It had no losses; the networks lost **0.60%**.
+The networks lost **24.67%** against the new policy, versus **12.44%** against
+random-tie minimax. The new tie-breaker is optimized for uniform random play,
+not specifically for exploiting these networks; those head-to-head results
+remain empirical observations, not a guarantee about all neural opponents.
 
 High per-position agreement does **not** imply reliable play over an entire game.
 Minimax has an exact guarantee; the network only approximates its strategy.
 Gameplay starts from the empty board and can visit training positions; only the
 position-level metrics use the held-out set.
+
+### Stronger baseline: random-aware minimax
+
+Ordinary minimax gives the same value to moves that guarantee the same worst-case
+outcome, then chooses among them uniformly. Those moves need not have the same
+chance of winning against a random opponent.
+
+The random-aware policy uses a lexicographic objective:
+
+1. Only consider moves with the **best minimax value**.
+2. Among those moves, maximize the probability of eventually winning against an
+   opponent that chooses **uniformly among all legal moves**.
+3. Break remaining equal-probability ties uniformly with the seeded RNG.
+
+The probability calculation recursively averages random opponent turns and
+maximizes safe player turns. It uses cached `Fraction` arithmetic, so comparisons
+and ties are exact rather than dependent on floating-point rounding. Winning
+contributes one; draws and losses contribute zero. Avoiding losses is enforced by
+the higher-priority minimax constraint, not traded away for more wins.
+
+From the empty board, the exact win probabilities for this policy are:
+
+| Role | Exact probability | Win rate |
+| --- | --- | ---: |
+| X | `191/192` | 99.48% |
+| O | `866/945` | 91.64% |
+| Balanced X/O | `115589/120960` | **95.56%** |
+
+These are analytical probabilities, not sampled estimates. They assume precisely
+the uniform-random opponent above; this tie-breaker is not claimed to maximize
+wins against every other opponent. The dataset and neural training objective
+remain unchanged: the network still imitates worst-case minimax move values.
 
 ### What the uncertainty estimates mean
 
@@ -148,7 +191,9 @@ choices among tied best legal moves.
 ### Design choices and limitations
 
 - **Minimax is the baseline, not the novelty.** Cached negamax implements the same
-  exact search with a compact player-relative recurrence.
+  exact search with a compact player-relative recurrence. Keep both the ordinary
+  random-tie policy and the random-aware safe policy to distinguish safety from
+  opponent-specific win-rate optimization.
 - **Supervised imitation, not self-play.** The network learns from a perfect teacher
   and has no search or rule-based tactical fallback when choosing a move.
 - **Small by design.** Only 3×3 tic-tac-toe and one hidden layer are supported.
@@ -168,7 +213,7 @@ choices among tied best legal moves.
 | `src/neuralnet/network.py` | Activations, forward/backward passes, SGD, checkpoints |
 | `src/neuralnet/game.py` | Immutable boards, rules, reachable states, exact minimax |
 | `src/neuralnet/data.py` | Teacher data, validation, fingerprints, symmetry-aware splits |
-| `src/neuralnet/players.py` | Random/minimax/neural policies and game runner |
+| `src/neuralnet/players.py` | Random, ordinary/random-aware minimax, neural policies and matches |
 | `src/neuralnet/experiment.py` | Training, held-out metrics, baseline tournaments |
 | `src/neuralnet/config.py` | Immutable experiment settings, shared defaults and validation |
 | `src/neuralnet/statistics.py` | Wilson intervals and network-level bootstrap summaries |
@@ -243,8 +288,10 @@ python -m build
 Tests include finite-difference checks of **every weight and bias** for both sigmoid
 and tanh, XOR convergence, complete batch coverage, all eight winning lines,
 dataset rejection cases, symmetry separation, model round-trips, and a CLI pipeline.
-An exhaustive continuation test verifies minimax cannot lose from the empty board
-as either player, against every legal opponent continuation.
+Exhaustive continuation tests verify that ordinary and random-aware minimax cannot
+lose from the empty board as either player, against every legal opponent
+continuation. Additional checks cover every reachable position, all tied preferred
+moves, and exact win probabilities via independent enumeration of the policy tree.
 Additional tests verify cohort reproducibility, distinct seeds with identical
 held-out membership, X/O balancing, statistical interval calculations, and reload
 of each independently saved checkpoint.
