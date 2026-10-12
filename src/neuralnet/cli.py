@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .config import ExperimentConfig
 from .data import generate_dataset, load_dataset, save_dataset
-from .experiment import evaluate, train_model
+from .experiment import evaluate, run_experiment, train_model
 from .network import NeuralNetwork
 
 _DEFAULTS = ExperimentConfig()
@@ -60,10 +60,11 @@ def main(argv: list[str] | None = None) -> None:
         '--seed', dest='evaluation_seed', type=int, help='override the checkpoint evaluation seed'
     )
     evaluate_parser.add_argument('--output', type=Path)
-    demo_parser = commands.add_parser('demo', help='run generate, train and evaluate')
+    demo_parser = commands.add_parser('demo', help='train and evaluate a cohort of networks')
     demo_parser.add_argument('--output-dir', type=Path, default=Path('artifacts'))
     demo_parser.add_argument('--games', type=int, default=_DEFAULTS.games)
     demo_parser.add_argument('--evaluation-seed', type=int, default=_DEFAULTS.evaluation_seed)
+    demo_parser.add_argument('--networks', type=int, default=_DEFAULTS.networks)
     _add_training_options(demo_parser)
     args = parser.parse_args(argv)
     try:
@@ -108,15 +109,12 @@ def main(argv: list[str] | None = None) -> None:
         else:
             config = _experiment_config(args)
             inputs, targets = generate_dataset()
-            model = train_model(inputs, targets, config=config)
-            report = {
-                'training': model.metadata,
-                'evaluation': evaluate(model, inputs, targets, config=config),
-            }
+            models, report = run_experiment(inputs, targets, config=config)
             save_dataset(args.output_dir / 'moves.json', inputs, targets)
-            model.save(args.output_dir / 'model.npz')
+            for index, model in enumerate(models, start=1):
+                model.save(args.output_dir / 'models' / f'network-{index:02d}.npz')
             _write_report(args.output_dir / 'experiment.json', report)
-            print(json.dumps(report['evaluation'], indent=2))
+            print(json.dumps(report['summary'], indent=2))
             print(f'Artifacts saved to {args.output_dir}')
     except (ValueError, OSError) as error:
         parser.exit(2, f'error: {error}\n')

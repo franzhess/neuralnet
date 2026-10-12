@@ -1,7 +1,7 @@
 """Reproducible train/held-out evaluation and game-level baseline comparisons."""
 
 import platform
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import numpy as np
 
@@ -9,6 +9,7 @@ from .config import ExperimentConfig
 from .data import Array, fingerprint, split_indices
 from .network import NeuralNetwork, Tanh
 from .players import Policy, minimax_move, neural_policy, play_game, random_move
+from .statistics import OUTCOMES, outcome_statistics, summarize_runs
 
 
 def train_model(
@@ -32,6 +33,7 @@ def train_model(
         'dataset_sha256': fingerprint(inputs, targets),
         'train_samples': len(train),
         'test_samples': len(test),
+        'held_out_indices': test.tolist(),
         'initial_train_loss': initial_loss,
         'final_train_loss': model.loss(inputs[train], targets[train]),
         'held_out_loss': model.loss(inputs[test], targets[test]),
@@ -60,17 +62,27 @@ def agreement(model: NeuralNetwork, inputs: Array, targets: Array) -> dict[str, 
 
 def tournament(player: Policy, opponent: Policy, *, games: int, seed: int) -> dict[str, int]:
     """Alternate player roles equally, without training during evaluation."""
+    counts, _ = _matchup(player, opponent, games=games, seed=seed)
+    return counts
+
+
+def _matchup(
+    player: Policy, opponent: Policy, *, games: int, seed: int
+) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
     if games < 2 or games % 2:
         raise ValueError('games must be a positive even number of at least two')
     rng = np.random.default_rng(seed)
-    results = {'wins': 0, 'draws': 0, 'losses': 0}
+    results = dict.fromkeys(OUTCOMES, 0)
+    by_role = {role: dict.fromkeys(OUTCOMES, 0) for role in ('x', 'o')}
     for index in range(games):
         sign = 1 if index % 2 == 0 else -1
         outcome = (
             play_game(player, opponent, rng) if sign == 1 else play_game(opponent, player, rng)
         ) * sign
-        results[{1: 'wins', 0: 'draws', -1: 'losses'}[outcome]] += 1
-    return results
+        label = {1: 'wins', 0: 'draws', -1: 'losses'}[outcome]
+        results[label] += 1
+        by_role['x' if sign == 1 else 'o'][label] += 1
+    return results, by_role
 
 
 def evaluate(
@@ -86,20 +98,77 @@ def evaluate(
         raise ValueError('evaluation dataset does not match the training checkpoint')
     training_config = ExperimentConfig.from_metadata(metadata)
     config = config if config is not None else training_config
-    _, test = split_indices(
-        inputs, seed=training_config.split_seed, test_fraction=training_config.test_fraction
-    )
+    if 'held_out_indices' in metadata:
+        test = np.asarray(metadata['held_out_indices'])
+        if (
+            test.ndim != 1
+            or not len(test)
+            or not np.issubdtype(test.dtype, np.integer)
+            or np.any(test < 0)
+            or np.any(test >= len(inputs))
+            or len(np.unique(test)) != len(test)
+        ):
+            raise ValueError('invalid recorded held-out indices')
+    else:
+        _, test = split_indices(
+            inputs, seed=training_config.split_seed, test_fraction=training_config.test_fraction
+        )
     neural = neural_policy(model)
     match_settings = {'games': config.games, 'seed': config.evaluation_seed}
+    policies = {
+        'neural_vs_random': (neural, random_move),
+        'neural_vs_minimax': (neural, minimax_move),
+        'random_vs_random': (random_move, random_move),
+        'minimax_vs_random': (minimax_move, random_move),
+        'minimax_vs_minimax': (minimax_move, minimax_move),
+    }
+    results, statistics = {}, {}
+    for name, (player, opponent) in policies.items():
+        counts, by_role = _matchup(player, opponent, **match_settings)
+        results[name] = counts
+        statistics[name] = {
+            'overall': outcome_statistics(counts),
+            'by_role': {
+                role: outcome_statistics(role_counts) for role, role_counts in by_role.items()
+            },
+        }
     return {
         'evaluation_seed': config.evaluation_seed,
         'games_per_matchup': config.games,
         'held_out_samples': len(test),
         'held_out_loss': model.loss(inputs[test], targets[test]),
         **agreement(model, inputs[test], targets[test]),
-        'neural_vs_random': tournament(neural, random_move, **match_settings),
-        'neural_vs_minimax': tournament(neural, minimax_move, **match_settings),
-        'random_vs_random': tournament(random_move, random_move, **match_settings),
-        'minimax_vs_random': tournament(minimax_move, random_move, **match_settings),
-        'minimax_vs_minimax': tournament(minimax_move, minimax_move, **match_settings),
+        **results,
+        'matchup_statistics': statistics,
+    }
+
+
+def run_experiment(
+    inputs: Array, targets: Array, *, config: ExperimentConfig | None = None
+) -> tuple[list[NeuralNetwork], dict]:
+    """Train independent networks on one split, retaining every run, not just the best."""
+    config = config if config is not None else ExperimentConfig()
+    models, runs = [], []
+    for index in range(config.networks):
+        run_config = replace(
+            config,
+            seed=config.seed + index,
+            evaluation_seed=config.evaluation_seed + index,
+            networks=1,
+        )
+        model = train_model(inputs, targets, config=run_config)
+        models.append(model)
+        runs.append(
+            {
+                'network_index': index + 1,
+                'training': model.metadata,
+                'evaluation': evaluate(model, inputs, targets),
+            }
+        )
+    return models, {
+        'schema_version': 2,
+        'config': asdict(config),
+        'dataset_sha256': fingerprint(inputs, targets),
+        'runs': runs,
+        'summary': summarize_runs(runs),
     }

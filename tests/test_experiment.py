@@ -3,7 +3,7 @@ import pytest
 
 from neuralnet import ExperimentConfig
 from neuralnet.data import generate_dataset
-from neuralnet.experiment import agreement, evaluate, train_model
+from neuralnet.experiment import agreement, evaluate, run_experiment, train_model
 from neuralnet.network import NeuralNetwork
 
 
@@ -48,6 +48,7 @@ def test_older_checkpoints_preserve_legacy_evaluation_defaults():
     del model.metadata['evaluation_seed']
     del model.metadata['split_seed']
     del model.metadata['networks']
+    del model.metadata['held_out_indices']
     report = evaluate(model, inputs, targets)
     assert report['games_per_matchup'] == 200
     assert report['held_out_samples'] == model.metadata['test_samples']
@@ -64,6 +65,38 @@ def test_training_seed_does_not_change_the_held_out_split():
     assert first.metadata['test_samples'] == second.metadata['test_samples']
     assert first.metadata['split_seed'] == second.metadata['split_seed']
     assert not np.array_equal(first.input_weights, second.input_weights)
+    assert first.metadata['held_out_indices'] == second.metadata['held_out_indices']
+
+
+def test_cohort_has_distinct_seeds_one_split_and_repeatable_statistics():
+    inputs, targets = generate_dataset()
+    config = ExperimentConfig(epochs=1, hidden_nodes=8, networks=2, games=4)
+    models, report = run_experiment(inputs, targets, config=config)
+    again_models, again = run_experiment(inputs, targets, config=config)
+    assert report == again
+    assert [run['training']['seed'] for run in report['runs']] == [42, 43]
+    assert [run['evaluation']['evaluation_seed'] for run in report['runs']] == [123, 124]
+    assert (
+        report['runs'][0]['training']['held_out_indices']
+        == report['runs'][1]['training']['held_out_indices']
+    )
+    assert not np.array_equal(models[0].input_weights, models[1].input_weights)
+    for model, other in zip(models, again_models, strict=True):
+        np.testing.assert_array_equal(model.input_weights, other.input_weights)
+    for matchup, summary in report['summary']['matchups'].items():
+        assert summary['games'] == sum(summary['counts'].values()) == 8
+        for run in report['runs']:
+            roles = run['evaluation']['matchup_statistics'][matchup]['by_role']
+            assert roles['x']['games'] == roles['o']['games'] == 2
+
+
+@pytest.mark.parametrize('indices', [[], [0, 0], [-1], [999999], [0.5]])
+def test_evaluation_rejects_invalid_saved_holdout_indices(indices):
+    inputs, targets = generate_dataset()
+    model = train_model(inputs, targets, config=ExperimentConfig(epochs=0, games=4))
+    model.metadata['held_out_indices'] = indices
+    with pytest.raises(ValueError, match='held-out indices'):
+        evaluate(model, inputs, targets)
 
 
 def test_agreement_counts_all_optimal_moves_not_one_teacher_choice():

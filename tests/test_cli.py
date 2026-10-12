@@ -48,13 +48,31 @@ def test_cli_end_to_end_from_outside_source_tree(tmp_path):
             check=True,
         )
 
-    run('demo', '--epochs', 2, '--hidden-nodes', 8, '--games', 4, '--output-dir', tmp_path)
+    run(
+        'demo',
+        '--epochs',
+        2,
+        '--hidden-nodes',
+        8,
+        '--games',
+        4,
+        '--networks',
+        2,
+        '--output-dir',
+        tmp_path,
+    )
     report = json.loads((tmp_path / 'experiment.json').read_text())
-    restored = run('evaluate', tmp_path / 'moves.json', tmp_path / 'model.npz')
-    assert json.loads(restored.stdout) == report['evaluation']
+    assert len(report['runs']) == 2
+    assert len(list((tmp_path / 'models').glob('*.npz'))) == 2
+    for run_report in report['runs']:
+        index = run_report['network_index']
+        restored = run(
+            'evaluate', tmp_path / 'moves.json', tmp_path / 'models' / f'network-{index:02d}.npz'
+        )
+        assert json.loads(restored.stdout) == run_report['evaluation']
     generated = tmp_path / 'separate.json'
     checkpoint = tmp_path / 'separate.npz'
     run('generate', generated)
     run('train', generated, checkpoint, '--epochs', 2, '--hidden-nodes', 8)
     result = run('evaluate', generated, checkpoint, '--games', 4)
-    assert json.loads(result.stdout) == report['evaluation']
+    assert json.loads(result.stdout) == report['runs'][0]['evaluation']
