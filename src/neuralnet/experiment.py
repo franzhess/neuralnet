@@ -7,8 +7,17 @@ import numpy as np
 
 from .config import ExperimentConfig
 from .data import Array, fingerprint, split_indices
+from .game import EMPTY
 from .network import NeuralNetwork, Tanh
-from .players import Policy, minimax_move, neural_policy, play_game, random_move
+from .players import (
+    Policy,
+    minimax_move,
+    neural_policy,
+    play_game,
+    random_aware_minimax_move,
+    random_aware_win_probability,
+    random_move,
+)
 from .statistics import OUTCOMES, outcome_statistics, summarize_runs
 
 
@@ -121,6 +130,9 @@ def evaluate(
         'random_vs_random': (random_move, random_move),
         'minimax_vs_random': (minimax_move, random_move),
         'minimax_vs_minimax': (minimax_move, minimax_move),
+        'neural_vs_random_aware_minimax': (neural, random_aware_minimax_move),
+        'random_aware_minimax_vs_random': (random_aware_minimax_move, random_move),
+        'random_aware_minimax_vs_minimax': (random_aware_minimax_move, minimax_move),
     }
     results, statistics = {}, {}
     for name, (player, opponent) in policies.items():
@@ -132,6 +144,16 @@ def evaluate(
                 role: outcome_statistics(role_counts) for role, role_counts in by_role.items()
             },
         }
+    x_probability = random_aware_win_probability(EMPTY, 1, 1)
+    o_probability = random_aware_win_probability(EMPTY, 1, -1)
+    exact = {
+        role: {'fraction': str(probability), 'probability': float(probability)}
+        for role, probability in (
+            ('x', x_probability),
+            ('o', o_probability),
+            ('balanced', (x_probability + o_probability) / 2),
+        )
+    }
     return {
         'evaluation_seed': config.evaluation_seed,
         'games_per_matchup': config.games,
@@ -140,6 +162,7 @@ def evaluate(
         **agreement(model, inputs[test], targets[test]),
         **results,
         'matchup_statistics': statistics,
+        'exact_baselines': {'random_aware_minimax_vs_random': exact},
     }
 
 
@@ -165,10 +188,12 @@ def run_experiment(
                 'evaluation': evaluate(model, inputs, targets),
             }
         )
+    summary = summarize_runs(runs)
+    summary['exact_baselines'] = runs[0]['evaluation']['exact_baselines']
     return models, {
-        'schema_version': 2,
+        'schema_version': 3,
         'config': asdict(config),
         'dataset_sha256': fingerprint(inputs, targets),
         'runs': runs,
-        'summary': summarize_runs(runs),
+        'summary': summary,
     }

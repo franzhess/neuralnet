@@ -12,6 +12,9 @@ MATCHUPS = (
     'random_vs_random',
     'minimax_vs_random',
     'minimax_vs_minimax',
+    'neural_vs_random_aware_minimax',
+    'random_aware_minimax_vs_random',
+    'random_aware_minimax_vs_minimax',
 )
 
 
@@ -81,6 +84,11 @@ def summarize_runs(
     metrics = ('held_out_loss', 'neural_optimal_move_agreement', 'random_optimal_move_agreement')
     matchups = {}
     for matchup in MATCHUPS:
+        present = [matchup in evaluation for evaluation in evaluations]
+        if not any(present):
+            continue
+        if not all(present):
+            raise ValueError('all runs must contain the same matchups')
         counts = {
             outcome: sum(evaluation[matchup][outcome] for evaluation in evaluations)
             for outcome in OUTCOMES

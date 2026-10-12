@@ -20,6 +20,12 @@ def test_training_checkpoint_and_evaluation_are_repeatable(tmp_path):
     assert report == evaluate(model, inputs, targets)
     assert report['minimax_vs_minimax'] == {'wins': 0, 'draws': 4, 'losses': 0}
     assert report['minimax_vs_random']['losses'] == 0
+    assert report['random_aware_minimax_vs_random']['losses'] == 0
+    assert report['random_aware_minimax_vs_minimax'] == {'wins': 0, 'draws': 4, 'losses': 0}
+    assert report['neural_vs_random_aware_minimax']['wins'] == 0
+    assert report['exact_baselines']['random_aware_minimax_vs_random']['balanced']['fraction'] == (
+        '115589/120960'
+    )
     for name, results in report.items():
         if '_vs_' in name:
             assert sum(results.values()) == 4
@@ -74,6 +80,10 @@ def test_cohort_has_distinct_seeds_one_split_and_repeatable_statistics():
     models, report = run_experiment(inputs, targets, config=config)
     again_models, again = run_experiment(inputs, targets, config=config)
     assert report == again
+    assert report['schema_version'] == 3
+    assert (
+        report['summary']['exact_baselines'] == report['runs'][0]['evaluation']['exact_baselines']
+    )
     assert [run['training']['seed'] for run in report['runs']] == [42, 43]
     assert [run['evaluation']['evaluation_seed'] for run in report['runs']] == [123, 124]
     assert (

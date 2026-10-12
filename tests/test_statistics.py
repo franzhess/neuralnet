@@ -39,3 +39,22 @@ def test_cohort_intervals_resample_networks_not_individual_games():
     assert single['matchups']['neural_vs_random']['rates']['wins']['bootstrap_mean_ci95'] is None
     with pytest.raises(ValueError):
         summarize_runs([])
+
+
+def test_legacy_matchups_are_supported_but_inconsistent_runs_are_rejected():
+    def run():
+        return {
+            'evaluation': {
+                'games_per_matchup': 4,
+                'held_out_loss': 0.2,
+                'neural_optimal_move_agreement': 0.9,
+                'random_optimal_move_agreement': 0.6,
+                'neural_vs_random': {'wins': 3, 'draws': 1, 'losses': 0},
+            }
+        }
+
+    first, second = run(), run()
+    assert list(summarize_runs([first, second])['matchups']) == ['neural_vs_random']
+    second['evaluation']['random_aware_minimax_vs_random'] = {'wins': 4, 'draws': 0, 'losses': 0}
+    with pytest.raises(ValueError, match='same matchups'):
+        summarize_runs([first, second])
